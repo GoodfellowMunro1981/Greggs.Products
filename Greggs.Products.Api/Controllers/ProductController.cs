@@ -31,6 +31,16 @@ public class ProductController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public IActionResult Get(int pageStart = 0, int pageSize = 5, string currencyCode = null)
     {
+        if (pageStart < 0 || pageSize <= 0)
+        {
+            return BadRequest("Error: pageStart must be >= 0 and pageSize must be > 0");
+        }
+
+        if (pageSize > 500)
+        {
+            return BadRequest("Error: pageSize must be <= 500");
+        }
+
         try
         {
             var products = _dataAccess.List(pageStart, pageSize);
