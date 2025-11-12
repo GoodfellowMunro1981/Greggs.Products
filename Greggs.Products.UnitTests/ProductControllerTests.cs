@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using Greggs.Products.Api.Controllers;
+using Greggs.Products.Api.Conversions;
 using Greggs.Products.Api.DataAccess;
+using Greggs.Products.Api.Dtos;
 using Greggs.Products.Api.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -46,14 +48,14 @@ public class ProductControllerTests
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
-        var products = Assert.IsAssignableFrom<IEnumerable<Product>>(okResult.Value);
+        var products = Assert.IsAssignableFrom<IEnumerable<ProductDto>>(okResult.Value);
         Assert.Equal(2, products.Count());
 
         Assert.Equal("Sausage Roll", products.First().Name);
-        Assert.Equal(1.0m, products.First().PriceInPounds);
+        Assert.Equal(1.0m, products.First().Price);
 
         Assert.Equal("Steak Bake", products.Last().Name);
-        Assert.Equal(1.2m, products.Last().PriceInPounds);
+        Assert.Equal(1.2m, products.Last().Price);
     }
 
     [Fact]
@@ -72,14 +74,14 @@ public class ProductControllerTests
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
-        var products = Assert.IsAssignableFrom<IEnumerable<Product>>(okResult.Value);
+        var products = Assert.IsAssignableFrom<IEnumerable<ProductDto>>(okResult.Value);
         Assert.Equal(5, products.Count());
 
         Assert.Equal("Product 1", products.First().Name);
-        Assert.Equal(1.0m, products.First().PriceInPounds);
+        Assert.Equal(1.0m, products.First().Price);
 
         Assert.Equal("Product 5", products.Last().Name);
-        Assert.Equal(5.0m, products.Last().PriceInPounds);
+        Assert.Equal(5.0m, products.Last().Price);
     }
 
     [Fact]
@@ -106,14 +108,14 @@ public class ProductControllerTests
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
-        var products = Assert.IsAssignableFrom<IEnumerable<Product>>(okResult.Value);
+        var products = Assert.IsAssignableFrom<IEnumerable<ProductDto>>(okResult.Value);
         Assert.Equal(2, products.Count());
 
         Assert.Equal("Product 6", products.First().Name);
-        Assert.Equal(2.5m, products.First().PriceInPounds);
+        Assert.Equal(2.5m, products.First().Price);
 
         Assert.Equal("Product 7", products.Last().Name);
-        Assert.Equal(3.0m, products.Last().PriceInPounds);
+        Assert.Equal(3.0m, products.Last().Price);
     }
 
     [Fact]
@@ -132,14 +134,14 @@ public class ProductControllerTests
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result);
-        var products = Assert.IsAssignableFrom<IEnumerable<Product>>(okResult.Value);
+        var products = Assert.IsAssignableFrom<IEnumerable<ProductDto>>(okResult.Value);
         Assert.Equal(10, products.Count());
 
         Assert.Equal("Product 1", products.First().Name);
-        Assert.Equal(1.0m, products.First().PriceInPounds);
+        Assert.Equal(1.0m, products.First().Price);
 
         Assert.Equal("Product 10", products.Last().Name);
-        Assert.Equal(10.0m, products.Last().PriceInPounds);
+        Assert.Equal(10.0m, products.Last().Price);
     }
 
     [Fact]
@@ -171,6 +173,67 @@ public class ProductControllerTests
         // Assert
         _mockDataAccess.Verify(x => x.List(10, 20), Times.Once);
     }
+
+    [Fact]
+    public void Get_ReturnsOkResult_WithListOfProductsAndPriceConversion()
+    {
+        // Arrange
+        var testProducts = new List<Product>
+        {
+            new() {
+                Name = "Sausage Roll",
+                PriceInPounds = 1.0m
+            },
+            new() {
+                Name = "Steak Bake",
+                PriceInPounds = 1.2m
+            }
+        };
+
+        _mockDataAccess.Setup(x => x.List(It.IsAny<int>(), It.IsAny<int>()))
+            .Returns(testProducts);
+
+        // Act
+        var result = _controller.Get(0, 5, CurrencyConversion.CURRENCY_CODE_EURO);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var products = Assert.IsAssignableFrom<IEnumerable<ProductDto>>(okResult.Value);
+        Assert.Equal(2, products.Count());
+
+        Assert.Equal("Sausage Roll", products.First().Name);
+        Assert.Equal(1.10m, products.First().Price);
+
+        Assert.Equal("Steak Bake", products.Last().Name);
+        Assert.Equal(1.32m, products.Last().Price);
+    }
+
+    [Fact]
+    public void Get_WithDefaultParameters_ReturnsFirstFiveProductsAndPriceConversion()
+    {
+        // Arrange
+        var testProducts = Enumerable.Range(1, 5)
+            .Select(i => new Product { Name = $"Product {i}", PriceInPounds = i })
+            .ToList();
+
+        _mockDataAccess.Setup(x => x.List(0, 5))
+            .Returns(testProducts);
+
+        // Act
+        var result = _controller.Get(0, 5, CurrencyConversion.CURRENCY_CODE_EURO);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var products = Assert.IsAssignableFrom<IEnumerable<ProductDto>>(okResult.Value);
+        Assert.Equal(5, products.Count());
+
+        Assert.Equal("Product 1", products.First().Name);
+        Assert.Equal(1.10m, products.First().Price);
+
+        Assert.Equal("Product 5", products.Last().Name);
+        Assert.Equal(5.50m, products.Last().Price);
+    }
+
 
     [Fact]
     public void Get_WithNegativePageStart_ReturnsBadRequest()
@@ -218,5 +281,17 @@ public class ProductControllerTests
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         var errorMessage = Assert.IsAssignableFrom<string>(badRequest.Value);
         Assert.Equal("Error: pageSize must be <= 500", errorMessage);
+    }
+
+    [Fact]
+    public void Get_WithUnsupportedCurrencyCode_ReturnsBadRequest()
+    {
+        // Act
+        var result = _controller.Get(0, 5, "USD");
+
+        // Assert
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        var errorMessage = Assert.IsAssignableFrom<string>(badRequest.Value);
+        Assert.Equal("Error: CurrencyCode is not supported", errorMessage);
     }
 }

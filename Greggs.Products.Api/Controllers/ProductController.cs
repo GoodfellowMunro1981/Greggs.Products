@@ -41,6 +41,17 @@ public class ProductController : ControllerBase
             return BadRequest("Error: pageSize must be <= 500");
         }
 
+        switch(currencyCode)
+        {
+            case null:
+            case "":
+            case CurrencyConversion.CURRENCY_CODE_UNITED_KINGDOM:
+            case CurrencyConversion.CURRENCY_CODE_EURO:
+                break;
+            default:
+                return BadRequest($"Error: CurrencyCode is not supported");
+        }
+
         try
         {
             var products = _dataAccess.List(pageStart, pageSize);
