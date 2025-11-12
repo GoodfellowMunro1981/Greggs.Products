@@ -26,10 +26,14 @@ public class ProductAccess : IDataAccess<Product>
         var queryable = ProductDatabase.AsQueryable();
 
         if (pageStart.HasValue)
+        {
             queryable = queryable.Skip(pageStart.Value);
-
+        }
+            
         if (pageSize.HasValue)
+        {
             queryable = queryable.Take(pageSize.Value);
+        }
 
         return queryable.ToList();
     }
